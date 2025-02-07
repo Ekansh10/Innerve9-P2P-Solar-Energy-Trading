@@ -1,0 +1,188 @@
+.body{
+  background-color: #333;
+}
+.h-screen{
+  background-color: #182533;
+}
+.charts-container {
+    background-color: #1e1e2f;
+    color: white;
+    padding: 20px;
+    border-radius: 10px;
+  }
+  
+  .charts-title {
+    text-align: center;
+    font-size: 1.8rem;
+    color: #6e7574;
+  }
+  
+  .charts-legend {
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+    margin-bottom: 10px;
+  }
+  
+  .legend-item {
+    display: flex;
+    align-items: center;
+  }
+  
+  .legend-color {
+    width: 15px;
+    height: 15px;
+    border-radius: 50%;
+    margin-right: 5px;
+  }
+  
+  .charts-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 20px;
+  }
+  
+  .chart-box {
+    background: #282c40;
+    padding: 15px;
+    border-radius: 8px;
+    box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.2);
+    
+  }
+  
+  select {
+    padding: 8px;
+    border-radius: 3px;
+    background: #094ece;
+    color: white;
+    border: none;
+    font-weight: bold;
+  }
+  .filter-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-bottom: 15px;
+    position: relative;
+  }
+  
+  .filter-title {
+    font-size: 1.3rem;
+    font-weight: bold;
+    color: #c5ced6;
+    margin-bottom: 5px;
+    margin-right: 15px;
+    margin-left: 3px;
+    opacity: 0;
+    transform: translateY(-10px);
+    animation: fadeIn 1s ease-in-out forwards;
+  }
+  
+  .charts-select {
+    padding: 8px 12px;
+    font-size: 1rem;
+    border: 2px solid #182533;
+    border-radius: 6px;
+   
+    color: #222222;
+    cursor: pointer;
+    transition: 0.3s;
+  }
+  
+  .charts-select:hover {
+    background: #007bff;
+    color: white;
+  }
+  
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(-10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  /* Hide scrollbar for Chrome, Safari, and Edge */
+::-webkit-scrollbar {
+  display: none;
+}
+
+/* Hide scrollbar for Firefox */
+html {
+  scrollbar-width: none;
+}
+
+/* Hide scrollbar for IE, Edge, and Opera */
+body {
+  -ms-overflow-style: none;
+}
+@keyframes fadeInZoom {
+  0% {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes waveBounce {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-5px);
+  }
+}
+
+@keyframes glowingText {
+  0% {
+    text-shadow: 0 0 5px #78aea4, 0 0 10px #677875, 0 0 15px #00c49f;
+  }
+  50% {
+    text-shadow: 0 0 10px #4c4c4c, 0 0 20px #394442, 0 0 30px #00ffcc;
+  }
+  100% {
+    text-shadow: 0 0 5px #363f3d, 0 0 10px #515b59, 0 0 15px #4f5352;
+  }
+}
+
+.charts-title {
+  font-size: 26px;
+  font-weight: bold;
+  color: #17c1a2;
+  text-align: center;
+  margin-bottom: 20px;
+  animation: fadeInZoom 1s ease-in-out, waveBounce 2s infinite ease-in-out, glowingText 3s infinite alternate;
+}
+
+
+@keyframes bounceText {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+.underline-animation {
+  width: 50px;
+  height: 3px;
+  background-color: #00c49f;
+  margin: 5px auto;
+  animation: slideUnderline 2s infinite alternate ease-in-out;
+}
+
+@keyframes slideUnderline {
+  from {
+    width: 50px;
+  }
+  to {
+    width: 120px;
+  }
+}
+
