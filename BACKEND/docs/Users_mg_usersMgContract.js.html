@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: Users_mg/usersMgContract.js</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: Users_mg/usersMgContract.js</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>'use strict'
+
+const EndUserRecord = require('./endUserRecord.js')
+const EndUsersRecordList = require('./endUsersRecordList.js')
+
+const ExternalUserRecord = require('./externalUserRecord.js')
+const ExternalUsersRecordList = require('./externalUsersRecordList.js')
+
+const DSOCompanyRecord = require('./DSOCompanyRecord.js')
+const DSOCompaniesRecordList = require('./DSOCompaniesRecordList.js')
+
+const RetailerRecord = require('./retailerRecord.js')
+const RetailersRecordList = require('./retailersRecordList.js')
+
+const { Contract, Context } = require('fabric-contract-api')
+const Utils = require('./utils.js')
+const shim = require('fabric-shim');
+const ClientIdentity = shim.ClientIdentity;
+
+class EndUserContext extends Context {
+
+    constructor() {
+        super()
+        this.endUsersRecordList = new EndUsersRecordList(this)
+        this.externalUsersRecordList = new ExternalUsersRecordList(this)
+        this.DSOCompaniesRecordList = new DSOCompaniesRecordList(this)
+        this.retailersRecordList = new RetailersRecordList(this)
+
+    }
+
+}
+
+/**
+ * Smart contract managing end-user and external actors records.
+ *
+ */
+class EndUsersContract extends Contract {
+
+    constructor() {
+        super('org.p2penergy.endusercontract')
+    }
+
+    createContext() {
+        return new EndUserContext()
+    }
+
+    async init(ctx) {
+        console.log('Successfully instantiated the org.p2penergy.endusercontract smart contract.');
+    }
+
+    async unknownTransaction(ctx) {
+        throw new Error('Function name is missing.')
+    }
+
+    async beforeTransaction(ctx) {
+        console.log('---------------------beforeTransaction-----------------------')
+        let func_and_params = ctx.stub.getFunctionAndParameters()
+        console.log('---------------------func_and_params-----------------------')
+        console.log(func_and_params)
+        let cid = new ClientIdentity(ctx.stub);
+        console.log('---------------------FUNCTION EXECUTION START-----------------------')
+        ctx.enrollmentID = cid.getAttributeValue('hf.EnrollmentID')
+        ctx.mspID = cid.getMSPID()
+        console.log(`Caller MSP: ${ctx.mspID}, Caller username: ${ctx.enrollmentID}`)
+    }
+
+    async afterTransaction(ctx, results) {
+        console.log('---------------------afterTransaction-----------------------')
+        console.log(results)
+    }
+
+    /**
+     * Create a new user.
+     *
+     * @param {Context} ctx the transaction context
+     * @param {String} fullName the name of the user
+     * @param {String} EANNumber the ID number of Smart Meter
+     * @param {String} role the role in system (producer, consumer, prosumer, ...)
+     *
+     * @returns {JSON} the created record
+     * @throws {shim.error} transaction execution failure
+     */
+    async createEndUserRecord(ctx, fullName, EANNumber, role) {
+        try {
+            if (ctx.mspID !== Utils.endUserMSP) {
+                return shim.error(`Function private to ${Utils.endUserMSP}.`)
+            }
+
+            let record = EndUserRecord.createInstance(ctx.enrollmentID, fullName, EANNumber, role)
+            await ctx.endUsersRecordList.addRecord(record)
+
+            console.log(`Created endUser record: ${JSON.stringify(record)}`)
+            return record
+        } catch (e) {
+            let message = `Error in createEndUserRecord function: ${e}`
+            Utils.dumpError(e);
+            return shim.error(message)
+        }
+    }
+
+
+    /**
+     * Create a new external user.
+     *
+     * @param {Context} ctx the transaction context
+     * @param {String} fullName the name of the user
+     * @param {String} owner the creator
+     *
+     * @returns {JSON} the created record
+     * @throws {shim.error} transaction execution failure
+     */
+    async createExternalUserRecord(ctx, fullName) {
+        try {
+            if (ctx.mspID !== Utils.externalActorsMSP) {
+                return shim.error(`Function private to ${Utils.externalActorsMSP}.`)
+            }
+
+            let record = ExternalUserRecord.createInstance(ctx.enrollmentID, fullName)
+            await ctx.externalUsersRecordList.addRecord(record)
+            console.log(`Created endUser record: ${JSON.stringify(record)}`)
+            return record
+        } catch (e) {
+            let message = `Error in createExternalUserRecord function: ${e}`
+            Utils.dumpError(e);
+            return shim.error(message)
+        }
+    }
+
+    /**
+     * Evaluate a queryString
+     * This is the helper function for making queries using a query string
+     *
+     * @param {Context} ctx the transaction context
+     * @param {String} queryString the query string to be evaluated
+     */
+    async queryWithQueryString(ctx, queryString) {
+        console.log(`Caller MSP: ${ctx.mspID}, Caller username: ${ctx.enrollmentID}`)
+
+        let resultsIterator = await ctx.stub.getQueryResult(queryString);
+        let allResults = [];
+        while (true) {
+            let res = await resultsIterator.next();
+            if (res.value &amp;&amp; res.value.value.toString()) {
+                let jsonRes = {};
+                jsonRes.Key = res.value.key;
+                try {
+                    jsonRes.Record = JSON.parse(res.value.value.toString('utf8'));
+                } catch (err) {
+                    jsonRes.Record = res.value.value.toString('utf8');
+                }
+                allResults.push(jsonRes);
+            }
+            if (res.done) {
+                await resultsIterator.close();
+                return allResults
+            }
+        }
+        return allResults
+    }
+
+
+    /**
+     * Getting all users.
+     *
+     * @param {Context} ctx the transaction context
+     *
+     * @returns {JSON} the required records
+     * @throws {shim.error} transaction execution failure
+     */
+    async getAllEndUsers(ctx) {
+        try {
+            if (!(ctx.mspID === Utils.dsoMSP || ctx.mspID === Utils.mpoMSP || ctx.mspID === Utils.retailerMSP)) {
+                return shim.error(`Function private to ${Utils.dsoMSP},  ${Utils.mpoMSP} or ${Utils.retailerMSP}.`)
+            }
+
+            let queryString = {
+                "selector": {
+                    "recordType": 'enduser'
+                }
+            }
+            let queryResults = await this.queryWithQueryString(ctx, JSON.stringify(queryString));
+            return queryResults
+        } catch (e) {
+            let message = `Error in getAllEndUsers function: ${e}`
+            Utils.dumpError(e);
+            return shim.error(message)
+        }
+    }
+
+    /**
+     * Read record tied to caller's blockchain username.
+     *
+     * @param {Context} ctx the transaction context
+     *
+     * @returns {JSON} the query result
+     * @throws {shim.error} transaction execution failure
+     */
+    async getMyself(ctx) {
+        try {
+
+            let recordType = 'undefined'
+            switch (ctx.mspID) {
+                case Utils.dsoMSP:
+                    recordType = 'dso'
+                    break;
+                  case Utils.retailerMSP:
+                    recordType = 'retailer'
+                    break;
+                case Utils.endUserMSP:
+                    recordType = 'enduser'
+                    break;
+                case Utils.externalActorsMSP:
+                    recordType = 'externalactor'
+                    break;
+                case Utils.mpoMSP:
+                    recordType = 'marketplaceoperator'
+                    break;
+                default:
+                    recordType = 'undefined'
+              }
+
+            let queryString = {
+                "selector": {
+                    "recordType": recordType,
+                    "owner": ctx.enrollmentID
+                }
+            }
+            let queryResults = await this.queryWithQueryString(ctx, JSON.stringify(queryString));
+            return queryResults[0]
+        } catch (e) {
+            let message = `Error in getMyself function: ${e}`
+            Utils.dumpError(e);
+            return shim.error(message)
+        }
+    }
+
+     /**
+     * Create a new DSO company.
+     *
+     * @param {Context} ctx the transaction context
+     * @param {String} companyName the name of company
+     *
+     * @returns {JSON} the created record
+     * @throws {shim.error} transaction execution failure
+     */
+      async createDSOCompanyRecord(ctx, companyName) {
+        try {
+            if (ctx.mspID !== Utils.dsoMSP) {
+                return shim.error(`Function private to ${Utils.dsoMSP}.`)
+            }
+
+            let record = DSOCompanyRecord.createInstance(ctx.enrollmentID, companyName)
+            await ctx.DSOCompaniesRecordList.addRecord(record)
+            console.log(`Created DSOCompany record: ${JSON.stringify(record)}`)
+            return record
+        } catch (e) {
+            let message = `Error in createDSOCompanyRecord function: ${e}`
+            Utils.dumpError(e);
+            return shim.error(message)
+        }
+    }
+
+
+    /**
+     * Getting all DSO companies.
+     *
+     * @param {Context} ctx the transaction context
+     *
+     * @returns {JSON} the required records
+     * @throws {shim.error} transaction execution failure
+     */
+    async getAllDSOCompanies(ctx) {
+
+        try {
+            if (!(ctx.mspID === Utils.mpoMSP || ctx.mspID === Utils.retailerMSP)) {
+                return shim.error(`Function private to ${Utils.dsoMSP} and ${Utils.retailerMSP}.`)
+            }
+            let queryString = {
+                "selector": {
+                    "recordType": 'dso'
+                }
+            }
+            let queryResults = await this.queryWithQueryString(ctx, JSON.stringify(queryString));
+            return queryResults
+        } catch (e) {
+            let message = `Error in getAllDSOCompanies function: ${e}`
+            Utils.dumpError(e);
+            return shim.error(message)
+        }
+    }
+
+
+    /**
+     * Create a new retailer record.
+     *
+     * @param {Context} ctx the transaction context
+     * @param {String} companyName the name of the company
+     *
+     * @returns {JSON} the created record
+     * @throws {shim.error} transaction execution failure
+     */
+     async createRetailerRecord(ctx, companyName) {
+        try {
+
+            if (ctx.mspID !== Utils.retailerMSP) {
+                return shim.error(`Function private to ${Utils.retailerMSP}.`)
+            }
+            
+            let record = RetailerRecord.createInstance(ctx.enrollmentID, companyName)
+            await ctx.retailersRecordList.addRecord(record)
+            console.log(`Created retailer record: ${JSON.stringify(record)}`)
+            return record
+        } catch (e) {
+            let message = `Error in createRetailerRecord function: ${e}`
+            Utils.dumpError(e);
+            return shim.error(message)
+        }
+    }
+    
+
+    /**
+     * Getting all companies (retailers).
+     *
+     * @param {Context} ctx the transaction context
+     *
+     * @returns {JSON} the required records
+     * @throws {shim.error} transaction execution failure
+     */
+    async getAllRetailers(ctx) {
+        try {
+            if (!(ctx.mspID === Utils.dsoMSP || ctx.mspID === Utils.mpoMSP)) {
+                return shim.error(`Function private to ${Utils.dsoMSP} and  ${Utils.mpoMSP}.`)
+            }
+            let queryString = {
+                "selector": {
+                    "recordType": 'retailer'
+                }
+            }
+            let queryResults = await this.queryWithQueryString(ctx, JSON.stringify(queryString));
+            return queryResults
+        } catch (e) {
+            let message = `Error in getRetailers function: ${e}`
+            Utils.dumpError(e);
+            return shim.error(message)
+        }
+    }
+
+
+    /**
+     * Getting all marketplace operators.
+     *
+     * @param {Context} ctx the transaction context
+     *
+     * @returns {JSON} the required records
+     * @throws {shim.error} transaction execution failure
+     */
+     async getAllMarketplaceOperators(ctx) {
+        try {
+            if (!(ctx.mspID === Utils.dsoMSP || ctx.mspID === Utils.mpoMSP)) {
+                return shim.error(`Function private to ${Utils.dsoMSP} and  ${Utils.mpoMSP}.`)
+            }
+            let queryString = {
+                "selector": {
+                    "recordType": 'marketplaceoperator'
+                }
+            }
+            let queryResults = await this.queryWithQueryString(ctx, JSON.stringify(queryString));
+            return queryResults
+        } catch (e) {
+            let message = `Error in getAllMarketplaceOperators function: ${e}`
+            Utils.dumpError(e);
+            return shim.error(message)
+        }
+    }
+
+    /**
+     * Create a new marketplace opreator.
+     *
+     * @param {Context} ctx the transaction context
+     * @param {String} name the name of the marketplace opreator
+     *
+     * @returns {JSON} the created record
+     * @throws {shim.error} transaction execution failure
+     */
+     async createMarketplaceOperatorRecord(ctx, name) {
+        try {
+
+            if (ctx.mspID !== Utils.mpoMSP) {
+                return shim.error(`Function private to ${Utils.mpoMSP}.`)
+            }
+
+            let record = MarketplaceOperatorRecord.createInstance(ctx.enrollmentID, name)
+            await ctx.marketplaceOperatorsRecordList.addRecord(record)
+            console.log(`Created marketplaceOperator record: ${JSON.stringify(record)}`)
+            return record
+        } catch (e) {
+            let message = `Error in createMarketplaceOperatorRecord function: ${e}`
+            Utils.dumpError(e);
+            return shim.error(message)
+        }
+    }
+
+}
+
+module.exports = EndUsersContract</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Classes</h3><ul><li><a href="AuctionTradingContract.html">AuctionTradingContract</a></li><li><a href="DataSharingRequestsContract.html">DataSharingRequestsContract</a></li><li><a href="DirectContractsContract.html">DirectContractsContract</a></li><li><a href="DisputesContract.html">DisputesContract</a></li><li><a href="EndUsersContract.html">EndUsersContract</a></li><li><a href="EnergyBillsContract.html">EnergyBillsContract</a></li><li><a href="SmartMeterEntriesContract.html">SmartMeterEntriesContract</a></li></ul><h3>Global</h3><ul><li><a href="global.html#fs">fs</a></li><li><a href="global.html#util">util</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 3.6.7</a> on Wed Dec 01 2021 15:09:46 GMT+0100 (Central European Standard Time)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>
